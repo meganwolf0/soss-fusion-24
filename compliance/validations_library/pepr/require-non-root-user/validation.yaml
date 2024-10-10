@@ -1,0 +1,91 @@
+metadata:
+  name: check-all-pods-require-non-root-user
+  uuid: 9fed0fd3-8d2a-4ce3-8b11-419e0f3463f4
+domain: 
+  type: kubernetes
+  kubernetes-spec:
+    resources:
+      - name: pods
+        resource-rule:
+          version: v1
+          resource: pods
+          namespaces: []
+provider: 
+  type: opa
+  opa-spec:
+    rego: |
+      package validate
+      import rego.v1
+      
+      # Default values
+      default validate := false
+      default msg := "Not evaluated"
+
+      validate if {
+        check_pods_require_non_root_user.result
+      }
+
+      msg = check_pods_require_non_root_user.msg
+      msg_exempted_namespaces = concat(", ", exempt_namespaces)
+      msg_exempted_pods = concat(", ", exempt_pods)
+      msg_exempted_init_container_name = concat(", ", exempt_init_container_name)
+
+      # Check if all pods are not using root user
+      pods := {sprintf("%s/%s", [pod.metadata.namespace, pod.metadata.name]) | pod := input.pods[_]; pod.kind == "Pod"; not is_exempt(pod)}
+      pods_that_comply := {sprintf("%s/%s", [pod.metadata.namespace, pod.metadata.name]) | pod := input.pods[_]; specifies_non_root_user(pod); not is_exempt(pod)}
+
+      check_pods_require_non_root_user = {"result": true, "msg": msg} if {
+        pods_that_comply == pods
+        msg := "All pods require non-root user."
+      } else = {"result": false, "msg": msg} if {
+        count(pods - pods_that_comply) > 0
+        msg := sprintf("Some do not require non-root user: %v.", [concat(", ", pods - pods_that_comply)])
+      }
+
+      # Conditions that specify root user access applied to pod or container
+      specifies_non_root_user(pod) if {
+        containers := get_containers(pod)
+        every container in containers {
+          eval_run_as_non_root(container) == true
+          eval_run_as_user(container) != 0
+        }
+        eval_run_as_non_root(pod.spec) == true
+        eval_run_as_user(pod.spec) != 0
+      } else = false
+
+      # Undefined fields should PASS
+      eval_run_as_non_root(spec) := runAsNonRoot if {
+        runAsNonRoot = spec.securityContext.runAsNonRoot
+      } else = true
+
+      # Undefined fields should PASS
+      eval_run_as_user(spec) = runAsUser if {
+        runAsUser = spec.securityContext.runAsUser
+      } else = 1000
+
+      # Helper function to get all containers in a pod
+      get_containers(pod) = {c | c := pod.spec.containers[_]} |
+        {c | pod.spec.initContainers != null; c := pod.spec.initContainers[_]; not c.name in exempt_init_container_name} |
+        {c | pod.spec.ephemeralContainers != null; c := pod.spec.ephemeralContainers[_]}
+
+      # Exemptions
+      exempt_namespaces := {"uds-dev-stack", "zarf", "kube-system"}
+      exempt_pods := {"*/neuvector-controller-pod-*", "*/vector-*"}
+      exempt_init_container_name := {"istio-init"}
+      
+      is_exempt(pod) if {
+        pod.metadata.namespace in exempt_namespaces
+      }
+
+      is_exempt(pod) if {
+        some i
+        exempt_pod := exempt_pods[i]
+        glob.match(exempt_pod, null, sprintf("%s/%s", [pod.metadata.namespace, pod.metadata.name]))
+      }
+    output:
+      validation: validate.validate
+      observations:
+        - validate.msg
+        - validate.msg_exempted_namespaces
+        - validate.msg_exempted_pods
+        - validate.msg_exempted_init_container_name

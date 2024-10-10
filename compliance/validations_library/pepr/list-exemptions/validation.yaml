@@ -1,0 +1,31 @@
+metadata:
+  name: cluster-exemptions-validation
+  uuid: 70c7917b-abc3-4795-a9f6-467ea42dfd44
+domain:
+  type: kubernetes
+  kubernetes-spec:
+    resources:
+      - name: udsExemptions
+        resource-rule:
+          group: uds.dev
+          resource: exemptions
+          namespaces: ["uds-policy-exemptions"]
+          version: v1alpha1
+provider:
+  type: opa
+  opa-spec:
+    rego: |
+      package validate
+
+      # Default policy result
+      default validate := true
+
+      # List of UDS exemptions
+      exemptions := {exemption.title | exemption := input.udsExemptions[_].spec.exemptions[_]}
+
+      # Message detailing exemptions
+      msg := sprintf("UDS exemptions: %v", [exemptions])
+    output:
+      validation: validate.validate
+      observations:
+        - validate.msg

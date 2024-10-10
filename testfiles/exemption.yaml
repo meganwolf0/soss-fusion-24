@@ -1,0 +1,15 @@
+apiVersion: uds.dev/v1alpha1
+kind: Exemption
+metadata:
+  name: default
+  namespace: uds-policy-exemptions
+spec:
+  exemptions:
+    - policies:
+        - RequireNonRootUser
+      matcher:
+        namespace: default
+        name: "^.*$"
+        kind: pod
+      title: "all default pods"
+      description: "Exemption for all default pods"

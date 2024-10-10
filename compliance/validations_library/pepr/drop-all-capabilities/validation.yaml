@@ -1,0 +1,74 @@
+metadata:
+  name: check-all-pods-drop-all-capabilities
+  uuid: 20e21219-ec6f-46ec-a9f0-d9262aa2835c
+domain: 
+  type: kubernetes
+  kubernetes-spec:
+    resources:
+      - name: pods
+        resource-rule:
+          version: v1
+          resource: pods
+          namespaces: []
+provider: 
+  type: opa
+  opa-spec:
+    rego: |
+      package validate
+      import rego.v1
+
+      # Default values
+      default validate := false
+      default msg := "Not evaluated"
+
+      validate if {
+        check_pods_dropped_capabilities.result
+      }
+
+      msg = check_pods_dropped_capabilities.msg
+      msg_exempted_namespaces = concat(", ", exempt_namespaces)
+      msg_exempted_pods = concat(", ", exempt_pods)
+
+      # Check if all pods dropped all capabilities
+      pods := {sprintf("%s/%s", [pod.metadata.namespace, pod.metadata.name]) | pod := input.pods[_]; pod.kind == "Pod"; not is_exempt(pod)}
+      pods_that_comply := {sprintf("%s/%s", [pod.metadata.namespace, pod.metadata.name]) | pod := input.pods[_]; dropped_all(pod); not is_exempt(pod)}
+
+      check_pods_dropped_capabilities = {"result": true, "msg": msg} if {
+        pods_that_comply == pods
+        msg := "All pods dropped all capabilities."
+      } else = {"result": false, "msg": msg} if {
+        count(pods - pods_that_comply) > 0
+        msg := sprintf("Some pods didn't drop all capabilities: %v.", [concat(", ", pods - pods_that_comply)])
+      } 
+
+      # Condition that specifies a pod is dropping all capabilities
+      dropped_all(pod) if {
+        containers := get_containers(pod)
+        every container in containers {
+          container.securityContext.capabilities.drop == ["ALL"]
+        }
+      }
+
+      # Helper function to get all containers in a pod
+      get_containers(pod) = {c | c := pod.spec.containers[_]} |
+        {c | pod.spec.initContainers != null; c := pod.spec.initContainers[_]} |
+        {c | pod.spec.ephemeralContainers != null; c := pod.spec.ephemeralContainers[_]}
+
+      # Exemptions
+      exempt_namespaces := {"kube-system", "istio-system", "uds-dev-stack", "zarf"}
+      exempt_pods := {"*/neuvector-controller-pod-*", "*/neuvector-enforcer-pod-*"}
+
+      is_exempt(pod) if {
+        pod.metadata.namespace in exempt_namespaces
+      }
+      is_exempt(pod) if {
+        some i
+        exempt_pod := exempt_pods[i]
+        glob.match(exempt_pod, null, sprintf("%s/%s", [pod.metadata.namespace, pod.metadata.name]))
+      }
+    output:
+      validation: validate.validate
+      observations:
+        - validate.msg
+        - validate.msg_exempted_namespaces
+        - validate.msg_exempted_pods

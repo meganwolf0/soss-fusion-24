@@ -1,0 +1,25 @@
+pass:
+  - test: default
+    validation: validation.yaml
+    resources: resources.json
+    expected-validation: true
+  - test: set-non-root-user-container-grafana
+    validation: validation.yaml
+    resources: resources.json
+    permutation: '.pods |= map(if .metadata.namespace == "grafana" then (.spec.containers |= map(if .name == "grafana-sc-dashboard" then (.securityContext.runAsNonRoot = false) else . end)) else . end)'
+    expected-validation: false
+  - test: add-run-as-user-0-ephemeral-container-grafana
+    validation: validation.yaml
+    resources: resources.json
+    permutation: '.pods |= map(if .metadata.namespace == "grafana" then (.spec.ephemeralContainers = [{"securityContext": { "runAsUser": 0}}]) else . end)'
+    expected-validation: false
+  - test: add-run-as-user-0-init-container-grafana
+    validation: validation.yaml
+    resources: resources.json
+    permutation: '.pods |= map(if .metadata.namespace == "grafana" then (.spec.initContainers += [{"name": "bad-container", "securityContext": { "runAsNonRoot": true, "runAsUser": 0 }}]) else . end)'
+    expected-validation: false
+  - test: set-non-root-user-pod-spec-grafana
+    validation: validation.yaml
+    resources: resources.json
+    permutation: '.pods |= map(if .metadata.namespace == "grafana" then (.spec.securityContext.runAsNonRoot = false) else . end)'
+    expected-validation: false

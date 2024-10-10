@@ -1,0 +1,65 @@
+metadata:
+  name: components-isolated-by-network
+  uuid: 42a3813b-026e-4be5-b888-87bfd6fe2790
+domain:
+  type: kubernetes
+  kubernetes-spec:
+    create-resources:
+      - name: packageTest
+        namespace: validation-test
+        manifest: |
+          apiVersion: uds.dev/v1alpha1
+          kind: Package
+          metadata:
+            name: package-test
+            namespace: validation-test
+          spec:
+            network:   
+              # Allow rules generate NetworkPolicies
+              allow:
+                - direction: Ingress
+                  remoteGenerated: Anywhere
+    wait:
+      name: package-test
+      namespace: validation-test
+      group: uds.dev
+      version: v1alpha1
+      resource: packages
+      timeout: 1m
+    resources:
+      - name: netpols
+        resource-rule:
+          namespaces: ['validation-test']
+          resource: networkpolicies
+          version: v1
+          group: networking.k8s.io
+provider:
+  type: opa
+  opa-spec:
+    rego: |
+      package validate
+
+      default validate := false
+      default msg := "Not evaluated"
+
+      validate if {
+        check_all_network_policies_created.result
+      }
+      
+      msg = check_all_network_policies_created.msg
+      msg_netpols_created = concat(", ", netpols)
+
+      # Check if all network policies were created
+      num_netpols_expected := 5
+      netpols := {sprintf("%s/%s", [netpol.metadata.namespace, netpol.metadata.name]) | netpol := input.netpols[_]; netpol.kind == "NetworkPolicy"}
+
+      check_all_network_policies := {"result": true, "msg": msg} if {
+        count(netpols) == num_netpols_expected
+        msg := sprintf("All %d network policies were created.", [num_netpols_expected])
+      } else = {"result": false, "msg": msg} if {
+        msg := sprintf("Expected %d network policies, but only %d were created.", [num_netpols_expected, count(netpols)])
+      }
+    outputs:
+      observations:
+        - validate.msg
+        - validate.msg_netpols_created

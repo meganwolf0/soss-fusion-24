@@ -1,0 +1,131 @@
+component-definition:
+  components:
+    - control-implementations:
+        - description: Production Control Implementations - Read-only interrogation
+          implemented-requirements:
+            - control-id: cm-4
+              description: Pepr implements policies prevent unauthorized changes from occurring within the system.
+              links:
+                - href: file:./validations_library/pepr/healthcheck/validation.yaml
+                  rel: lula
+                  text: Pepr Controller and Watcher Healthcheck
+                - href: file:./validations_library/pepr/mutating-webhook-failure-policy/validation.yaml
+                  rel: lula
+                  text: Pepr Mutating Webhook Failure Policy set to Fail -> System fails closed
+                - href: file:./validations_library/pepr/drop-all-capabilities/validation.yaml
+                  rel: lula
+                  text: Check all pods in the system drop all capabilities
+                - href: file:./validations_library/pepr/require-non-root-user/validation.yaml
+                  rel: lula
+                  text: Check all pods in the system do not use root user
+              remarks: |
+                ASSESSMENT-OBJECTIVE:
+                CM-04[01] changes to the system are analyzed to determine potential security impacts prior to change implementation;
+                CM-04[02] changes to the system are analyzed to determine potential privacy impacts prior to change implementation.
+              uuid: 7ce1f9d9-6246-4067-a4a2-eb06502f27db
+          props:
+            - name: framework
+              ns: https://docs.lula.dev/oscal/ns
+              value: read
+          source: source-read
+          uuid: 72660e55-4a42-420a-8c12-0c9db3f5424d
+        - description: Staging Control Implementation - Writing to the system to test controller response
+          implemented-requirements:
+            - control-id: cm-4
+              description: Pepr implements policies prevent unauthorized changes from occurring within the system.
+              links:
+                - href: file:./validations_library/pepr/healthcheck/validation.yaml
+                  rel: lula
+                  text: Pepr Controller and Watcher Healthcheck
+                - href: file:./validations_library/pepr/mutating-webhook-failure-policy/validation.yaml
+                  rel: lula
+                  text: Pepr Mutating Webhook Failure Policy set to Fail -> System fails closed
+                - href: file:./validations_library/pepr/drop-all-capabilities-test/validation.yaml
+                  rel: lula
+                  text: Test admission controller denies or mutates pods to drop all capabilities -> Pepr "DropAllCapabilities"
+                - href: file:./validations_library/pepr/drop-all-capabilities/validation.yaml
+                  rel: lula
+                  text: Check all pods in the system drop all capabilities
+                - href: file:./validations_library/pepr/require-non-root-user-test/validation.yaml
+                  rel: lula
+                  text: Test admission controller denies pods trying to run as root user -> Pepr "RequireNonRootUser"
+                - href: file:./validations_library/pepr/require-non-root-user/validation.yaml
+                  rel: lula
+                  text: Check all pods in the system do not use root user
+              remarks: |
+                ASSESSMENT-OBJECTIVE:
+                CM-04[01] changes to the system are analyzed to determine potential security impacts prior to change implementation;
+                CM-04[02] changes to the system are analyzed to determine potential privacy impacts prior to change implementation.
+              uuid: 7ce1f9d9-6246-4067-a4a2-eb06502f27db
+          props:
+            - name: framework
+              ns: https://docs.lula.dev/oscal/ns
+              value: write
+          source: source-write
+          uuid: dd4d9f1c-1f23-577b-a783-800bfd156566
+        - description: Admission controller CR response
+          implemented-requirements:
+            - control-id: cm-4
+              description: Pepr implements policies prevent unauthorized changes from occurring within the system.
+              links:
+                - href: file:./validations_library/pepr/healthcheck/validation.yaml
+                  rel: lula
+                  text: Pepr Controller and Watcher Healthcheck
+                - href: file:./validations_library/pepr/mutating-webhook-failure-policy/validation.yaml
+                  rel: lula
+                  text: Pepr Mutating Webhook Failure Policy set to Fail -> System fails closed
+                - href: file:./validations_library/pepr/drop-all-capabilities-test/validation.yaml
+                  rel: lula
+                  text: Test admission controller denies or mutates pods to drop all capabilities -> Pepr "DropAllCapabilities"
+                - href: file:./validations_library/pepr/drop-all-capabilities/validation.yaml
+                  rel: lula
+                  text: Check all pods in the system drop all capabilities
+                - href: file:./validations_library/pepr/require-non-root-user-test/validation.yaml
+                  rel: lula
+                  text: Test admission controller denies pods trying to run as root user -> Pepr "RequireNonRootUser"
+                - href: file:./validations_library/pepr/require-non-root-user/validation.yaml
+                  rel: lula
+                  text: Check all pods in the system do not use root user
+              remarks: |
+                ASSESSMENT-OBJECTIVE:
+                CM-04[01] changes to the system are analyzed to determine potential security impacts prior to change implementation;
+                CM-04[02] changes to the system are analyzed to determine potential privacy impacts prior to change implementation.
+              uuid: 7ce1f9d9-6246-4067-a4a2-eb06502f27db
+            - control-id: sc-7.21
+              description: Policies are enabled to the boundary needed for incoming (ingress) and outgoing (egress) traffic and configure a network policy and/or a constraint configuration.
+              links:
+                - href: 'file:./validations_library/pepr/healthcheck/validation.yaml'
+                  rel: lula
+                  text: Pepr Controller and Watcher Healthcheck
+                - href: 'file:./validations_library/pepr/components-isolated-by-network-test/validation.yaml'
+                  rel: lula
+                  text: Check that new application has only the needed network policies
+              remarks: |
+                ASSESSMENT-OBJECTIVE:
+                boundary protection mechanisms are employed to isolate [Assignment: organization-defined system components] supporting [Assignment: organization-defined missions and/or business functions].
+              uuid: 3cefa46c-19e0-43f1-8d4f-96df8460af62
+          props:
+            - name: framework
+              ns: https://docs.lula.dev/oscal/ns
+              value: controller-check
+          source: source-controller-check
+          uuid: dd4d9f1c-1f23-577b-a783-800bfd156566
+      description: Component Description
+      title: UDS Operator
+      type: software
+      uuid: 9e050805-4dc0-4c9b-b877-660c466a9fb0
+  metadata:
+    last-modified: 2024-09-17T20:27:54.642813619Z
+    oscal-version: 1.1.2
+    parties:
+      - links:
+          - href: https://defenseunicorns.com
+            rel: website
+        name: Defense Unicorns
+        type: organization
+        uuid: bf31d461-82af-529a-8bdf-09aa488e5b7e
+    published: 2024-09-06T02:23:11.557826692Z
+    remarks: Lula Generated Component Definition
+    title: UDS Operator
+    version: 0.0.1
+  uuid: e080849b-052f-4243-9e79-60b60a134387

@@ -1,0 +1,68 @@
+metadata:
+  name: check-new-pods-disallow-root-user-test
+  uuid: 5da9d58f-3a60-44a6-b88e-833c3db4ace3
+domain: 
+  type: kubernetes
+  kubernetes-spec:
+    create-resources:
+      - name: allPodsBlocked
+        manifest: |
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: require-non-root-user-1
+            namespace: default
+            labels:
+              zarf.dev/agent: ignore
+          spec:
+            containers:
+            - name: container1
+              image: alpine:3.20
+              args: ["sleep", "infinity"]
+              securityContext:
+                runAsUser: 0
+          ---
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: require-non-root-user-2
+            namespace: default
+            labels:
+              zarf.dev/agent: ignore
+          spec:
+            initContainers:
+            - name: init1
+              image: alpine:3.20
+              args: ["sleep", "infinity"]
+              securityContext:
+                runAsUser: 0
+provider: 
+  type: opa
+  opa-spec:
+    rego: |
+      package validate
+      import rego.v1
+      
+      # Default values
+      default validate := false
+      default msg := "Not evaluated"
+
+      validate if {
+        check_allowed_pods.result
+      }
+
+      msg = check_allowed_pods.msg
+
+      # Check if any pods were created - policy should block all pods
+      pods_created := { sprintf("%s/%s", [pod.metadata.namespace, pod.metadata.name]) | pod := input.allPodsBlocked[_]; pod.kind == "Pod" }
+
+      check_allowed_pods = {"result": true, "msg": msg} if {
+        count(pods_created) == 0
+        msg := "No pods were created."
+      } else = {"result": false, "msg": msg} if {
+        msg := sprintf("Disallowed pods were created: %v.", [concat(", ", pods_created)])
+      }
+    output:
+      validation: validate.validate
+      observations:
+        - validate.msg

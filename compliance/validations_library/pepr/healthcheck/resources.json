@@ -1,0 +1,431 @@
+{
+  "peprControllerDeployment": {
+    "apiVersion": "apps/v1",
+    "kind": "Deployment",
+    "metadata": {
+      "annotations": {
+        "deployment.kubernetes.io/revision": "1",
+        "meta.helm.sh/release-name": "zarf-139ef014ab6166dd8a557b04b18f16b9a846925b",
+        "meta.helm.sh/release-namespace": "pepr-system",
+        "pepr.dev/description": "A collection of capabilities for UDS Core"
+      },
+      "creationTimestamp": "2024-05-02T13:22:56Z",
+      "generation": 1,
+      "labels": {
+        "app": "pepr-uds-core",
+        "app.kubernetes.io/managed-by": "Helm",
+        "pepr.dev/controller": "admission",
+        "pepr.dev/uuid": "uds-core"
+      },
+      "name": "pepr-uds-core",
+      "namespace": "pepr-system",
+      "resourceVersion": "366781",
+      "uid": "46ae0447-5198-47e6-bb75-8dce173bdc9c"
+    },
+    "spec": {
+      "progressDeadlineSeconds": 600,
+      "replicas": 2,
+      "revisionHistoryLimit": 10,
+      "selector": {
+        "matchLabels": {
+          "app": "pepr-uds-core",
+          "pepr.dev/controller": "admission"
+        }
+      },
+      "strategy": {
+        "rollingUpdate": {
+          "maxSurge": "25%",
+          "maxUnavailable": "25%"
+        },
+        "type": "RollingUpdate"
+      },
+      "template": {
+        "metadata": {
+          "annotations": {
+            "buildTimestamp": "1714518665136"
+          },
+          "creationTimestamp": null,
+          "labels": {
+            "app": "pepr-uds-core",
+            "pepr.dev/controller": "admission"
+          }
+        },
+        "spec": {
+          "containers": [
+            {
+              "command": [
+                "node",
+                "/app/node_modules/pepr/dist/controller.js",
+                "3926db80dd60926d3b7fe38f0adb14dd112588c84609489b0903cdfbb0080e62"
+              ],
+              "env": [
+                {
+                  "name": "PEPR_WATCH_MODE",
+                  "value": "false"
+                },
+                {
+                  "name": "PEPR_PRETTY_LOG",
+                  "value": "false"
+                },
+                {
+                  "name": "LOG_LEVEL",
+                  "value": "debug"
+                },
+                {
+                  "name": "UDS_DOMAIN",
+                  "value": "uds.dev"
+                },
+                {
+                  "name": "UDS_ALLOW_ALL_NS_EXEMPTIONS",
+                  "value": "###ZARF_VAR_ALLOW_ALL_NS_EXEMPTIONS###"
+                },
+                {
+                  "name": "UDS_SINGLE_TEST",
+                  "value": "###ZARF_VAR_UDS_SINGLE_TEST###"
+                }
+              ],
+              "image": "ghcr.io/defenseunicorns/pepr/controller:v0.29.2",
+              "imagePullPolicy": "IfNotPresent",
+              "livenessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 3000,
+                  "scheme": "HTTPS"
+                },
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "name": "server",
+              "ports": [
+                {
+                  "containerPort": 3000,
+                  "protocol": "TCP"
+                }
+              ],
+              "readinessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 3000,
+                  "scheme": "HTTPS"
+                },
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "resources": {
+                "limits": {
+                  "cpu": "500m",
+                  "memory": "256Mi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "64Mi"
+                }
+              },
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "runAsGroup": 65532,
+                "runAsNonRoot": true,
+                "runAsUser": 65532
+              },
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/etc/certs",
+                  "name": "tls-certs",
+                  "readOnly": true
+                },
+                {
+                  "mountPath": "/app/api-token",
+                  "name": "api-token",
+                  "readOnly": true
+                },
+                {
+                  "mountPath": "/app/load",
+                  "name": "module",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirst",
+          "priorityClassName": "system-node-critical",
+          "restartPolicy": "Always",
+          "schedulerName": "default-scheduler",
+          "securityContext": {
+            "fsGroup": 65532,
+            "runAsGroup": 65532,
+            "runAsNonRoot": true,
+            "runAsUser": 65532
+          },
+          "serviceAccount": "pepr-uds-core",
+          "serviceAccountName": "pepr-uds-core",
+          "terminationGracePeriodSeconds": 5,
+          "volumes": [
+            {
+              "name": "tls-certs",
+              "secret": {
+                "defaultMode": 420,
+                "secretName": "pepr-uds-core-tls"
+              }
+            },
+            {
+              "name": "api-token",
+              "secret": {
+                "defaultMode": 420,
+                "secretName": "pepr-uds-core-api-token"
+              }
+            },
+            {
+              "name": "module",
+              "secret": {
+                "defaultMode": 420,
+                "secretName": "pepr-uds-core-module"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "status": {
+      "availableReplicas": 2,
+      "conditions": [
+        {
+          "lastTransitionTime": "2024-05-02T13:22:56Z",
+          "lastUpdateTime": "2024-05-02T13:23:07Z",
+          "message": "ReplicaSet \"pepr-uds-core-bdfcf4bcc\" has successfully progressed.",
+          "reason": "NewReplicaSetAvailable",
+          "status": "True",
+          "type": "Progressing"
+        },
+        {
+          "lastTransitionTime": "2024-05-06T20:14:28Z",
+          "lastUpdateTime": "2024-05-06T20:14:28Z",
+          "message": "Deployment has minimum availability.",
+          "reason": "MinimumReplicasAvailable",
+          "status": "True",
+          "type": "Available"
+        }
+      ],
+      "observedGeneration": 1,
+      "readyReplicas": 2,
+      "replicas": 2,
+      "updatedReplicas": 2
+    }
+  },
+  "peprWatcherDeployment": {
+    "apiVersion": "apps/v1",
+    "kind": "Deployment",
+    "metadata": {
+      "annotations": {
+        "deployment.kubernetes.io/revision": "1",
+        "meta.helm.sh/release-name": "zarf-139ef014ab6166dd8a557b04b18f16b9a846925b",
+        "meta.helm.sh/release-namespace": "pepr-system",
+        "pepr.dev/description": "A collection of capabilities for UDS Core"
+      },
+      "creationTimestamp": "2024-05-02T13:22:56Z",
+      "generation": 1,
+      "labels": {
+        "app": "pepr-uds-core-watcher",
+        "app.kubernetes.io/managed-by": "Helm",
+        "pepr.dev/controller": "watcher",
+        "pepr.dev/uuid": "uds-core"
+      },
+      "name": "pepr-uds-core-watcher",
+      "namespace": "pepr-system",
+      "resourceVersion": "366671",
+      "uid": "064ce733-ea61-4a54-a2fa-429403077453"
+    },
+    "spec": {
+      "progressDeadlineSeconds": 600,
+      "replicas": 1,
+      "revisionHistoryLimit": 10,
+      "selector": {
+        "matchLabels": {
+          "app": "pepr-uds-core-watcher",
+          "pepr.dev/controller": "watcher"
+        }
+      },
+      "strategy": {
+        "type": "Recreate"
+      },
+      "template": {
+        "metadata": {
+          "annotations": {
+            "buildTimestamp": "1714518665136"
+          },
+          "creationTimestamp": null,
+          "labels": {
+            "app": "pepr-uds-core-watcher",
+            "pepr.dev/controller": "watcher"
+          }
+        },
+        "spec": {
+          "containers": [
+            {
+              "command": [
+                "node",
+                "/app/node_modules/pepr/dist/controller.js",
+                "3926db80dd60926d3b7fe38f0adb14dd112588c84609489b0903cdfbb0080e62"
+              ],
+              "env": [
+                {
+                  "name": "PEPR_WATCH_MODE",
+                  "value": "true"
+                },
+                {
+                  "name": "PEPR_PRETTY_LOG",
+                  "value": "false"
+                },
+                {
+                  "name": "LOG_LEVEL",
+                  "value": "debug"
+                },
+                {
+                  "name": "UDS_DOMAIN",
+                  "value": "uds.dev"
+                },
+                {
+                  "name": "UDS_ALLOW_ALL_NS_EXEMPTIONS",
+                  "value": "###ZARF_VAR_ALLOW_ALL_NS_EXEMPTIONS###"
+                },
+                {
+                  "name": "UDS_SINGLE_TEST",
+                  "value": "###ZARF_VAR_UDS_SINGLE_TEST###"
+                }
+              ],
+              "image": "ghcr.io/defenseunicorns/pepr/controller:v0.29.2",
+              "imagePullPolicy": "IfNotPresent",
+              "livenessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 3000,
+                  "scheme": "HTTPS"
+                },
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "name": "watcher",
+              "ports": [
+                {
+                  "containerPort": 3000,
+                  "protocol": "TCP"
+                }
+              ],
+              "readinessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 3000,
+                  "scheme": "HTTPS"
+                },
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "resources": {
+                "limits": {
+                  "cpu": "500m",
+                  "memory": "256Mi"
+                },
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "64Mi"
+                }
+              },
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "runAsGroup": 65532,
+                "runAsNonRoot": true,
+                "runAsUser": 65532
+              },
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/etc/certs",
+                  "name": "tls-certs",
+                  "readOnly": true
+                },
+                {
+                  "mountPath": "/app/load",
+                  "name": "module",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirst",
+          "restartPolicy": "Always",
+          "schedulerName": "default-scheduler",
+          "securityContext": {
+            "fsGroup": 65532,
+            "runAsGroup": 65532,
+            "runAsNonRoot": true,
+            "runAsUser": 65532
+          },
+          "serviceAccount": "pepr-uds-core",
+          "serviceAccountName": "pepr-uds-core",
+          "terminationGracePeriodSeconds": 5,
+          "volumes": [
+            {
+              "name": "tls-certs",
+              "secret": {
+                "defaultMode": 420,
+                "secretName": "pepr-uds-core-tls"
+              }
+            },
+            {
+              "name": "module",
+              "secret": {
+                "defaultMode": 420,
+                "secretName": "pepr-uds-core-module"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "status": {
+      "availableReplicas": 1,
+      "conditions": [
+        {
+          "lastTransitionTime": "2024-05-02T13:22:56Z",
+          "lastUpdateTime": "2024-05-02T13:23:06Z",
+          "message": "ReplicaSet \"pepr-uds-core-watcher-85d8dd68d4\" has successfully progressed.",
+          "reason": "NewReplicaSetAvailable",
+          "status": "True",
+          "type": "Progressing"
+        },
+        {
+          "lastTransitionTime": "2024-05-06T20:14:25Z",
+          "lastUpdateTime": "2024-05-06T20:14:25Z",
+          "message": "Deployment has minimum availability.",
+          "reason": "MinimumReplicasAvailable",
+          "status": "True",
+          "type": "Available"
+        }
+      ],
+      "observedGeneration": 1,
+      "readyReplicas": 1,
+      "replicas": 1,
+      "updatedReplicas": 1
+    }
+  }
+}

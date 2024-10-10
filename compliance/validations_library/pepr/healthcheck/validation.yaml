@@ -1,0 +1,71 @@
+metadata:
+  name: pepr-health-check
+  uuid: 419274c0-cd55-46de-a7e4-e10d47be3f4a
+domain:
+  type: kubernetes
+  kubernetes-spec:
+    resources:
+    - name: peprControllerDeployment
+      resource-rule:
+        group: apps
+        name: pepr-uds-core
+        namespaces: [pepr-system]
+        resource: deployments
+        version: v1
+    - name: peprWatcherDeployment
+      resource-rule:
+        group: apps
+        name: pepr-uds-core-watcher
+        namespaces: [pepr-system]
+        resource: deployments
+        version: v1
+provider:
+  type: opa
+  opa-spec:
+    rego: |
+      package validate
+      import rego.v1
+      
+      # Default values
+      default validate := false
+      default msg := "Not evaluated"
+
+      # Check if the Pepr application deployments are healthy
+      validate if {
+        controller_deployment_available.result
+        controller_deployment_sufficient.result
+        watcher_deployment_available.result
+        watcher_deployment_sufficient.result
+      }
+
+      msg = concat(" ", [controller_deployment_available.msg, controller_deployment_sufficient.msg, watcher_deployment_available.msg, watcher_deployment_sufficient.msg])
+
+      # Check that both controller and watch deployments ready
+      pepr_controller := input.peprControllerDeployment
+      pepr_watcher := input.peprWatcherDeployment
+
+      controller_deployment_available := deployment_available(pepr_controller, "pepr-uds-core")
+      controller_deployment_sufficient := sufficient_replicas(pepr_controller, "pepr-uds-core")
+      watcher_deployment_available := deployment_available(pepr_watcher, "pepr-uds-core-watcher")
+      watcher_deployment_sufficient := sufficient_replicas(pepr_watcher, "pepr-uds-core-watcher")
+
+      # Check if the deployment is ready
+      deployment_available(deploy, name) = {"result": true, "msg": msg} if {
+        deploy.kind == "Deployment"
+        msg := sprintf("%s deployment is available.", [name])
+      } else = {"result": false, "msg": msg} if {
+        msg := sprintf("%s deployment not available.", [name])
+      }
+
+      # Check if the deployment has sufficient replicas
+      sufficient_replicas(deploy, name) = {"result": true, "msg": msg} if {
+        deploy.status.replicas > 0
+        deploy.status.availableReplicas == deploy.status.replicas
+        msg := sprintf("All replicas are available in %s.", [name])
+      } else = {"result": false, "msg": msg} if {
+        msg := sprintf("Insufficient replicas are available in %s.", [name])
+      }
+    output:
+      validation: validate.validate
+      observations:
+      - validate.msg

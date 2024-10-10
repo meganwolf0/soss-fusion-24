@@ -1,0 +1,46 @@
+metadata:
+  name: pepr-mutating-webhook-failure-policy
+  uuid: 82e9fb56-a290-4adf-9d2c-25b8ea45a726
+domain:
+  type: kubernetes
+  kubernetes-spec:
+    resources:
+      - name: webhooks
+        resource-rule:
+          group: admissionregistration.k8s.io
+          resource: mutatingwebhookconfigurations
+          namespaces: []
+          version: v1
+provider:
+  type: opa
+  opa-spec:
+    rego: |
+      package validate
+      import rego.v1
+      
+      # Default values
+      default validate := false
+      default msg := "Not evaluated"
+
+      validate if {
+        failure_policy.result
+      }
+
+      msg = failure_policy.msg
+
+      # Check pepr mutating webhook failure policy
+      pepr_mutation_webhook := wh if {
+        some i
+        wh := input.webhooks[i]
+        wh.metadata.name == "pepr-uds-core"      
+      }
+
+      failure_policy = {"result": true, "msg": "Pepr mutating webhook failure policy is set to Fail"} if {
+        every webhook in pepr_mutation_webhook.webhooks {
+          webhook.failurePolicy == "Fail"
+        }
+      } else = {"result": false, "msg": "Pepr mutating webhook failure policy is NOT set to Fail"}
+    output:
+      validation: validate.validate
+      observations:
+        - validate.msg

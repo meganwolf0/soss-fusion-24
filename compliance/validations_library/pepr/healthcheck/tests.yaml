@@ -1,0 +1,25 @@
+pass:
+  - test: default
+    validation: validation.yaml
+    resources: resources.json
+    expected-validation: true
+  - test: remove_peprControllerDeployment
+    validation: validation.yaml
+    resources: resources.json
+    permutation: "del(.peprControllerDeployment)"
+    expected-validation: false
+  - test: remove_peprWatcherDeployment
+    validation: validation.yaml
+    resources: resources.json
+    permutation: "del(.peprWatcherDeployment)"
+    expected-validation: false
+  - test: reduce_status_numberAvailable_to_zero_for_peprControllerDeployment
+    validation: validation.yaml
+    resources: resources.json
+    permutation: ".peprControllerDeployment.status.availableReplicas = 0"
+    expected-validation: false
+  - test: reduce_status_numberAvailable_to_zero_for_peprWatcherDeployment
+    validation: validation.yaml
+    resources: resources.json
+    permutation: ".peprWatcherDeployment.status.availableReplicas = 0"
+    expected-validation: false

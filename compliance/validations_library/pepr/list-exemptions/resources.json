@@ -1,0 +1,145 @@
+{
+  "udsExemptions": [
+    {
+      "apiVersion": "uds.dev/v1alpha1",
+      "kind": "Exemption",
+      "metadata": {
+        "annotations": {
+          "meta.helm.sh/release-name": "uds-neuvector-config",
+          "meta.helm.sh/release-namespace": "neuvector"
+        },
+        "creationTimestamp": "2024-06-07T14:38:19Z",
+        "generation": 1,
+        "labels": {
+          "app.kubernetes.io/managed-by": "Helm"
+        },
+        "name": "neuvector",
+        "namespace": "uds-policy-exemptions",
+        "resourceVersion": "1910",
+        "uid": "f45b0e1a-9912-4ef0-bb66-0cd8e5c384f4"
+      },
+      "spec": {
+        "exemptions": [
+          {
+            "description": "Neuvector requires HostPath volume types Neuvector mounts the following hostPaths: `/var/neuvector`: (as writable) for Neuvector's buffering and persistent state `/var/run`: communication to docker daemon `/proc`: monitoring of processes for malicious activity `/sys/fs/cgroup`: important files the controller wants to monitor for malicious content https://github.com/neuvector/neuvector-helm/blob/master/charts/core/templates/enforcer-daemonset.yaml#L108",
+            "matcher": {
+              "kind": "pod",
+              "name": "^neuvector-enforcer-pod.*",
+              "namespace": "neuvector"
+            },
+            "policies": [
+              "DisallowHostNamespaces",
+              "DisallowPrivileged",
+              "RequireNonRootUser",
+              "DropAllCapabilities",
+              "RestrictHostPathWrite",
+              "RestrictVolumeTypes"
+            ],
+            "title": "neuvector-enforcer-pod"
+          },
+          {
+            "description": "Neuvector requires HostPath volume types. Neuvector mounts the following hostPaths: `/var/neuvector`: (as writable) for Neuvector's buffering and persistent state `/var/run`: communication to docker daemon `/proc`: monitoring of processes for malicious activity `/sys/fs/cgroup`: important files the controller wants to monitor for malicious content https://github.com/neuvector/neuvector-helm/blob/master/charts/core/templates/enforcer-daemonset.yaml#L108",
+            "matcher": {
+              "kind": "pod",
+              "name": "^neuvector-controller-pod.*",
+              "namespace": "neuvector"
+            },
+            "policies": [
+              "DisallowPrivileged",
+              "RequireNonRootUser",
+              "DropAllCapabilities",
+              "RestrictHostPathWrite",
+              "RestrictVolumeTypes"
+            ],
+            "title": "neuvector-controller-pod"
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "uds.dev/v1alpha1",
+      "kind": "Exemption",
+      "metadata": {
+        "annotations": {
+          "meta.helm.sh/release-name": "uds-prometheus-config",
+          "meta.helm.sh/release-namespace": "monitoring"
+        },
+        "creationTimestamp": "2024-06-07T14:40:25Z",
+        "generation": 1,
+        "labels": {
+          "app.kubernetes.io/managed-by": "Helm"
+        },
+        "name": "monitoring",
+        "namespace": "uds-policy-exemptions",
+        "resourceVersion": "2860",
+        "uid": "f1aefdfb-9bc7-461e-bb49-36a6b171101b"
+      },
+      "spec": {
+        "exemptions": [
+          {
+            "matcher": {
+              "kind": "pod",
+              "name": "^prometheus-kube-prometheus-stack-prometheus-.*",
+              "namespace": "monitoring"
+            },
+            "policies": [
+              "RestrictHostPathWrite",
+              "RestrictVolumeTypes"
+            ],
+            "title": "prometheus kube stack"
+          },
+          {
+            "matcher": {
+              "kind": "pod",
+              "name": "^kube-prometheus-stack-prometheus-node-exporter-.*",
+              "namespace": "monitoring"
+            },
+            "policies": [
+              "RestrictVolumeTypes"
+            ],
+            "title": "prometheus node exporter"
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "uds.dev/v1alpha1",
+      "kind": "Exemption",
+      "metadata": {
+        "annotations": {
+          "meta.helm.sh/release-name": "uds-promtail-config",
+          "meta.helm.sh/release-namespace": "promtail"
+        },
+        "creationTimestamp": "2024-06-07T14:41:05Z",
+        "generation": 1,
+        "labels": {
+          "app.kubernetes.io/managed-by": "Helm"
+        },
+        "name": "promtail",
+        "namespace": "uds-policy-exemptions",
+        "resourceVersion": "3422",
+        "uid": "7edaa2c7-debc-4fc5-8414-b3df17b72b73"
+      },
+      "spec": {
+        "exemptions": [
+          {
+            "description": "Promtail mounts the following hostPaths: - `/var/log/pods`: to tail pod logs - `/var/lib/docker/containers`: to tail container logs - `/run/promtail`: for Promtail's buffering and persistent state Since logs can have sensitive information, it is better to exclude Promtail from the policy than add the paths as allowable mounts https://github.com/grafana/helm-charts/blob/main/charts/promtail/templates/daemonset.yaml#L120",
+            "matcher": {
+              "kind": "pod",
+              "name": "^promtail-.*",
+              "namespace": "promtail"
+            },
+            "policies": [
+              "DisallowPrivileged",
+              "RequireNonRootUser",
+              "RestrictSELinuxType",
+              "RestrictHostPathWrite",
+              "RestrictVolumeTypes"
+            ],
+            "title": "promtail exemptions"
+          }
+        ]
+      }
+    }
+  ]
+}
