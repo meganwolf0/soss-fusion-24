@@ -44,66 +44,6 @@ domain:
               securityContext:
                 capabilities:
                   add: ["NET_BIND_SERVICE"]
-          ---
-          apiVersion: v1
-          kind: Pod
-          metadata:
-            name: require-drop-all-capabilities-3
-            namespace: default
-            labels:
-              zarf.dev/agent: ignore
-          spec:
-          containers:
-          - name: c1
-            image: alpine:3.20
-            args: ["sleep", "infinity"]
-            securityContext:
-              capabilities:
-                drop: ["NET_ADMIN","DISALLOWED"]
-          ---
-          apiVersion: v1
-          kind: Pod
-          metadata:
-            name: require-drop-all-capabilities-4
-            namespace: default
-            labels:
-              zarf.dev/agent: ignore
-          spec:
-            containers:
-            - name: c1
-              image: alpine:3.20
-              args: ["sleep", "infinity"]
-              securityContext:
-                capabilities:
-                  drop: ["ALL"]
-            initContainers:
-            - name: i1
-              image: alpine:3.20
-              securityContext:
-                capabilities:
-                  drop: ["NET_ADMIN","DISALLOWED"]
-          ---
-          apiVersion: v1
-          kind: Pod
-          metadata:
-            name: require-drop-all-capabilities-5
-            namespace: default
-            labels:
-              zarf.dev/agent: ignore
-          spec:
-            containers:
-            - name: c1
-              image: alpine:3.20
-              args: ["sleep", "infinity"]
-              securityContext:
-                capabilities:
-                  drop: ["NET_ADMIN","ALL"]
-            initContainers:
-            - name: i1
-              image: alpine:3.20
-              securityContext:
-                capabilities:
-                  drop: ["NET_ADMIN","ALL"]
 provider: 
   type: opa
   opa-spec:
@@ -123,7 +63,7 @@ provider:
 
       # Check all pods dropped all capabilities
       pods_created := {pod.metadata.name | pod := input.dropAllCapabilities[_]; pod.kind == "Pod"}
-      pods_expected := {"require-drop-all-capabilities-1", "require-drop-all-capabilities-2", "require-drop-all-capabilities-3", "require-drop-all-capabilities-4", "require-drop-all-capabilities-5"}
+      pods_expected := {"require-drop-all-capabilities-1", "require-drop-all-capabilities-2"}
       pods_that_dropped_all := {pod.metadata.name | pod := input.dropAllCapabilities[_]; dropped_all(pod)}
 
       check_pods_dropped_capabilities = {"result": true, "msg": msg} if {

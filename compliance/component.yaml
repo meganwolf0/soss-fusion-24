@@ -65,32 +65,6 @@ component-definition:
           uuid: dd4d9f1c-1f23-577b-a783-800bfd156566
         - description: Admission controller CR response
           implemented-requirements:
-            - control-id: cm-4
-              description: Pepr implements policies prevent unauthorized changes from occurring within the system.
-              links:
-                - href: file:./validations_library/pepr/healthcheck/validation.yaml
-                  rel: lula
-                  text: Pepr Controller and Watcher Healthcheck
-                - href: file:./validations_library/pepr/mutating-webhook-failure-policy/validation.yaml
-                  rel: lula
-                  text: Pepr Mutating Webhook Failure Policy set to Fail -> System fails closed
-                - href: file:./validations_library/pepr/drop-all-capabilities-test/validation.yaml
-                  rel: lula
-                  text: Test admission controller denies or mutates pods to drop all capabilities -> Pepr "DropAllCapabilities"
-                - href: file:./validations_library/pepr/drop-all-capabilities/validation.yaml
-                  rel: lula
-                  text: Check all pods in the system drop all capabilities
-                - href: file:./validations_library/pepr/require-non-root-user-test/validation.yaml
-                  rel: lula
-                  text: Test admission controller denies pods trying to run as root user -> Pepr "RequireNonRootUser"
-                - href: file:./validations_library/pepr/require-non-root-user/validation.yaml
-                  rel: lula
-                  text: Check all pods in the system do not use root user
-              remarks: |
-                ASSESSMENT-OBJECTIVE:
-                CM-04[01] changes to the system are analyzed to determine potential security impacts prior to change implementation;
-                CM-04[02] changes to the system are analyzed to determine potential privacy impacts prior to change implementation.
-              uuid: 7ce1f9d9-6246-4067-a4a2-eb06502f27db
             - control-id: sc-7.21
               description: Policies are enabled to the boundary needed for incoming (ingress) and outgoing (egress) traffic and configure a network policy and/or a constraint configuration.
               links:

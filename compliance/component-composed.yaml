@@ -1,0 +1,671 @@
+component-definition:
+  back-matter:
+    resources:
+      - description: |
+          domain:
+            kubernetes-spec:
+              create-resources: null
+              resources:
+              - description: ""
+                name: pods
+                resource-rule:
+                  group: ""
+                  name: ""
+                  namespaces: []
+                  resource: pods
+                  version: v1
+            type: kubernetes
+          lula-version: ""
+          metadata:
+            name: check-all-pods-drop-all-capabilities
+            uuid: 20e21219-ec6f-46ec-a9f0-d9262aa2835c
+          provider:
+            opa-spec:
+              output:
+                observations:
+                - validate.msg
+                - validate.msg_exempted_namespaces
+                - validate.msg_exempted_pods
+                validation: validate.validate
+              rego: |
+                package validate
+                import rego.v1
+
+                # Default values
+                default validate := false
+                default msg := "Not evaluated"
+
+                validate if {
+                  check_pods_dropped_capabilities.result
+                }
+
+                msg = check_pods_dropped_capabilities.msg
+                msg_exempted_namespaces = concat(", ", exempt_namespaces)
+                msg_exempted_pods = concat(", ", exempt_pods)
+
+                # Check if all pods dropped all capabilities
+                pods := {sprintf("%s/%s", [pod.metadata.namespace, pod.metadata.name]) | pod := input.pods[_]; pod.kind == "Pod"; not is_exempt(pod)}
+                pods_that_comply := {sprintf("%s/%s", [pod.metadata.namespace, pod.metadata.name]) | pod := input.pods[_]; dropped_all(pod); not is_exempt(pod)}
+
+                check_pods_dropped_capabilities = {"result": true, "msg": msg} if {
+                  pods_that_comply == pods
+                  msg := "All pods dropped all capabilities."
+                } else = {"result": false, "msg": msg} if {
+                  count(pods - pods_that_comply) > 0
+                  msg := sprintf("Some pods didn't drop all capabilities: %v.", [concat(", ", pods - pods_that_comply)])
+                }
+
+                # Condition that specifies a pod is dropping all capabilities
+                dropped_all(pod) if {
+                  containers := get_containers(pod)
+                  every container in containers {
+                    container.securityContext.capabilities.drop == ["ALL"]
+                  }
+                }
+
+                # Helper function to get all containers in a pod
+                get_containers(pod) = {c | c := pod.spec.containers[_]} |
+                  {c | pod.spec.initContainers != null; c := pod.spec.initContainers[_]} |
+                  {c | pod.spec.ephemeralContainers != null; c := pod.spec.ephemeralContainers[_]}
+
+                # Exemptions
+                exempt_namespaces := {"kube-system", "istio-system", "uds-dev-stack", "zarf"}
+                exempt_pods := {"*/neuvector-controller-pod-*", "*/neuvector-enforcer-pod-*"}
+
+                is_exempt(pod) if {
+                  pod.metadata.namespace in exempt_namespaces
+                }
+                is_exempt(pod) if {
+                  some i
+                  exempt_pod := exempt_pods[i]
+                  glob.match(exempt_pod, null, sprintf("%s/%s", [pod.metadata.namespace, pod.metadata.name]))
+                }
+            type: opa
+        title: check-all-pods-drop-all-capabilities
+        uuid: 20e21219-ec6f-46ec-a9f0-d9262aa2835c
+      - description: |
+          domain:
+            kubernetes-spec:
+              create-resources: null
+              resources:
+              - description: ""
+                name: pods
+                resource-rule:
+                  group: ""
+                  name: ""
+                  namespaces: []
+                  resource: pods
+                  version: v1
+            type: kubernetes
+          lula-version: ""
+          metadata:
+            name: check-all-pods-require-non-root-user
+            uuid: 9fed0fd3-8d2a-4ce3-8b11-419e0f3463f4
+          provider:
+            opa-spec:
+              output:
+                observations:
+                - validate.msg
+                - validate.msg_exempted_namespaces
+                - validate.msg_exempted_pods
+                - validate.msg_exempted_init_container_name
+                validation: validate.validate
+              rego: |
+                package validate
+                import rego.v1
+
+                # Default values
+                default validate := false
+                default msg := "Not evaluated"
+
+                validate if {
+                  check_pods_require_non_root_user.result
+                }
+
+                msg = check_pods_require_non_root_user.msg
+                msg_exempted_namespaces = concat(", ", exempt_namespaces)
+                msg_exempted_pods = concat(", ", exempt_pods)
+                msg_exempted_init_container_name = concat(", ", exempt_init_container_name)
+
+                # Check if all pods are not using root user
+                pods := {sprintf("%s/%s", [pod.metadata.namespace, pod.metadata.name]) | pod := input.pods[_]; pod.kind == "Pod"; not is_exempt(pod)}
+                pods_that_comply := {sprintf("%s/%s", [pod.metadata.namespace, pod.metadata.name]) | pod := input.pods[_]; specifies_non_root_user(pod); not is_exempt(pod)}
+
+                check_pods_require_non_root_user = {"result": true, "msg": msg} if {
+                  pods_that_comply == pods
+                  msg := "All pods require non-root user."
+                } else = {"result": false, "msg": msg} if {
+                  count(pods - pods_that_comply) > 0
+                  msg := sprintf("Some do not require non-root user: %v.", [concat(", ", pods - pods_that_comply)])
+                }
+
+                # Conditions that specify root user access applied to pod or container
+                specifies_non_root_user(pod) if {
+                  containers := get_containers(pod)
+                  every container in containers {
+                    eval_run_as_non_root(container) == true
+                    eval_run_as_user(container) != 0
+                  }
+                  eval_run_as_non_root(pod.spec) == true
+                  eval_run_as_user(pod.spec) != 0
+                } else = false
+
+                # Undefined fields should PASS
+                eval_run_as_non_root(spec) := runAsNonRoot if {
+                  runAsNonRoot = spec.securityContext.runAsNonRoot
+                } else = true
+
+                # Undefined fields should PASS
+                eval_run_as_user(spec) = runAsUser if {
+                  runAsUser = spec.securityContext.runAsUser
+                } else = 1000
+
+                # Helper function to get all containers in a pod
+                get_containers(pod) = {c | c := pod.spec.containers[_]} |
+                  {c | pod.spec.initContainers != null; c := pod.spec.initContainers[_]; not c.name in exempt_init_container_name} |
+                  {c | pod.spec.ephemeralContainers != null; c := pod.spec.ephemeralContainers[_]}
+
+                # Exemptions
+                exempt_namespaces := {"uds-dev-stack", "zarf", "kube-system"}
+                exempt_pods := {"*/neuvector-controller-pod-*", "*/vector-*"}
+                exempt_init_container_name := {"istio-init"}
+
+                is_exempt(pod) if {
+                  pod.metadata.namespace in exempt_namespaces
+                }
+
+                is_exempt(pod) if {
+                  some i
+                  exempt_pod := exempt_pods[i]
+                  glob.match(exempt_pod, null, sprintf("%s/%s", [pod.metadata.namespace, pod.metadata.name]))
+                }
+            type: opa
+        title: check-all-pods-require-non-root-user
+        uuid: 9fed0fd3-8d2a-4ce3-8b11-419e0f3463f4
+      - description: |
+          domain:
+            kubernetes-spec:
+              create-resources:
+              - file: ""
+                manifest: |
+                  apiVersion: v1
+                  kind: Pod
+                  metadata:
+                    name: require-non-root-user-1
+                    namespace: default
+                    labels:
+                      zarf.dev/agent: ignore
+                  spec:
+                    containers:
+                    - name: container1
+                      image: alpine:3.20
+                      args: ["sleep", "infinity"]
+                      securityContext:
+                        runAsUser: 0
+                  ---
+                  apiVersion: v1
+                  kind: Pod
+                  metadata:
+                    name: require-non-root-user-2
+                    namespace: default
+                    labels:
+                      zarf.dev/agent: ignore
+                  spec:
+                    initContainers:
+                    - name: init1
+                      image: alpine:3.20
+                      args: ["sleep", "infinity"]
+                      securityContext:
+                        runAsUser: 0
+                name: allPodsBlocked
+                namespace: ""
+              resources: null
+            type: kubernetes
+          lula-version: ""
+          metadata:
+            name: check-new-pods-disallow-root-user-test
+            uuid: 5da9d58f-3a60-44a6-b88e-833c3db4ace3
+          provider:
+            opa-spec:
+              output:
+                observations:
+                - validate.msg
+                validation: validate.validate
+              rego: |
+                package validate
+                import rego.v1
+
+                # Default values
+                default validate := false
+                default msg := "Not evaluated"
+
+                validate if {
+                  check_allowed_pods.result
+                }
+
+                msg = check_allowed_pods.msg
+
+                # Check if any pods were created - policy should block all pods
+                pods_created := { sprintf("%s/%s", [pod.metadata.namespace, pod.metadata.name]) | pod := input.allPodsBlocked[_]; pod.kind == "Pod" }
+
+                check_allowed_pods = {"result": true, "msg": msg} if {
+                  count(pods_created) == 0
+                  msg := "No pods were created."
+                } else = {"result": false, "msg": msg} if {
+                  msg := sprintf("Disallowed pods were created: %v.", [concat(", ", pods_created)])
+                }
+            type: opa
+        title: check-new-pods-disallow-root-user-test
+        uuid: 5da9d58f-3a60-44a6-b88e-833c3db4ace3
+      - description: |
+          domain:
+            kubernetes-spec:
+              create-resources:
+              - file: ""
+                manifest: |
+                  apiVersion: v1
+                  kind: Pod
+                  metadata:
+                    name: require-drop-all-capabilities-1
+                    namespace: default
+                    labels:
+                      zarf.dev/agent: ignore
+                  spec:
+                    containers:
+                    - name: c1
+                      image: alpine:3.20
+                      args: ["sleep", "infinity"]
+                      securityContext:
+                        capabilities:
+                          add: ["NET_BIND_SERVICE"]
+                  ---
+                  apiVersion: v1
+                  kind: Pod
+                  metadata:
+                    name: require-drop-all-capabilities-2
+                    namespace: default
+                    labels:
+                      zarf.dev/agent: ignore
+                  spec:
+                    containers:
+                    - name: c1
+                      image: alpine:3.20
+                      args: ["sleep", "infinity"]
+                      securityContext:
+                        capabilities:
+                          drop: ["ALL"]
+                    initContainers:
+                    - name: i1
+                      image: alpine:3.20
+                      securityContext:
+                        capabilities:
+                          add: ["NET_BIND_SERVICE"]
+                name: dropAllCapabilities
+                namespace: ""
+              resources: null
+            type: kubernetes
+          lula-version: ""
+          metadata:
+            name: check-new-pods-drop-all-capabilities-test
+            uuid: 912255cd-56da-4de2-983b-4b0c3e78ae17
+          provider:
+            opa-spec:
+              output:
+                observations:
+                - validate.msg
+                validation: validate.validate
+              rego: |
+                package validate
+                import rego.v1
+
+                # Default values
+                default validate := false
+                default msg := "Not evaluated"
+
+                validate if {
+                  check_pods_dropped_capabilities.result
+                }
+
+                msg = check_pods_dropped_capabilities.msg
+
+                # Check all pods dropped all capabilities
+                pods_created := {pod.metadata.name | pod := input.dropAllCapabilities[_]; pod.kind == "Pod"}
+                pods_expected := {"require-drop-all-capabilities-1", "require-drop-all-capabilities-2"}
+                pods_that_dropped_all := {pod.metadata.name | pod := input.dropAllCapabilities[_]; dropped_all(pod)}
+
+                check_pods_dropped_capabilities = {"result": true, "msg": msg} if {
+                  pods_created == pods_expected
+                  pods_that_dropped_all == pods_created
+                  msg := "All pods dropped all capabilities."
+                } else = {"result": false, "msg": msg} if {
+                  count(pods_created - pods_that_dropped_all) > 0
+                  msg := sprintf("Some pods didn't drop all capabilities: %v.", [concat(", ", pods_created - pods_that_dropped_all)])
+                }
+
+                # Condition that specifies a pod is dropping all capabilities
+                dropped_all(pod) if {
+                  containers := get_containers(pod)
+                  every container in containers{
+                    container.securityContext.capabilities.drop == ["ALL"]
+                  }
+                }
+
+                # Helper function to get all containers in a pod
+                get_containers(pod) = {c | c := pod.spec.containers[_]} |
+                  {c | pod.spec.initContainers != null; c := pod.spec.initContainers[_]} |
+                  {c | pod.spec.ephemeralContainers != null; c := pod.spec.ephemeralContainers[_]}
+            type: opa
+        title: check-new-pods-drop-all-capabilities-test
+        uuid: 912255cd-56da-4de2-983b-4b0c3e78ae17
+      - description: |
+          domain:
+            kubernetes-spec:
+              create-resources:
+              - file: ""
+                manifest: |
+                  apiVersion: uds.dev/v1alpha1
+                  kind: Package
+                  metadata:
+                    name: package-test
+                    namespace: validation-test
+                  spec:
+                    network:
+                      # Allow rules generate NetworkPolicies
+                      allow:
+                        - direction: Ingress
+                          remoteGenerated: Anywhere
+                name: packageTest
+                namespace: validation-test
+              resources:
+              - description: ""
+                name: netpols
+                resource-rule:
+                  group: networking.k8s.io
+                  name: ""
+                  namespaces:
+                  - validation-test
+                  resource: networkpolicies
+                  version: v1
+              wait:
+                group: uds.dev
+                name: package-test
+                namespace: validation-test
+                resource: packages
+                timeout: 1m
+                version: v1alpha1
+            type: kubernetes
+          lula-version: ""
+          metadata:
+            name: components-isolated-by-network
+            uuid: 42a3813b-026e-4be5-b888-87bfd6fe2790
+          provider:
+            opa-spec:
+              output:
+                observations:
+                - validate.msg
+                - validate.msg_netpols_created
+                validation: validate.validate
+              rego: |
+                package validate
+                import rego.v1
+
+                default validate := false
+                default msg := "Not evaluated"
+
+                validate if {
+                  check_all_network_policies_created.result
+                }
+
+                msg = check_all_network_policies_created.msg
+                msg_netpols_created = concat(", ", netpols)
+
+                # Check if all network policies were created
+                num_netpols_expected := 5
+                netpols := {sprintf("%s/%s", [netpol.metadata.namespace, netpol.metadata.name]) | netpol := input.netpols[_]; netpol.kind == "NetworkPolicy"}
+
+                check_all_network_policies_created := {"result": true, "msg": msg} if {
+                  count(netpols) == num_netpols_expected
+                  msg := sprintf("All %d network policies were created.", [num_netpols_expected])
+                } else = {"result": false, "msg": msg} if {
+                  msg := sprintf("Expected %d network policies, but only %d were created.", [num_netpols_expected, count(netpols)])
+                }
+            type: opa
+        title: components-isolated-by-network
+        uuid: 42a3813b-026e-4be5-b888-87bfd6fe2790
+      - description: |
+          domain:
+            kubernetes-spec:
+              create-resources: null
+              resources:
+              - description: ""
+                name: peprControllerDeployment
+                resource-rule:
+                  group: apps
+                  name: pepr-uds-core
+                  namespaces:
+                  - pepr-system
+                  resource: deployments
+                  version: v1
+              - description: ""
+                name: peprWatcherDeployment
+                resource-rule:
+                  group: apps
+                  name: pepr-uds-core-watcher
+                  namespaces:
+                  - pepr-system
+                  resource: deployments
+                  version: v1
+            type: kubernetes
+          lula-version: ""
+          metadata:
+            name: pepr-health-check
+            uuid: 419274c0-cd55-46de-a7e4-e10d47be3f4a
+          provider:
+            opa-spec:
+              output:
+                observations:
+                - validate.msg
+                validation: validate.validate
+              rego: |
+                package validate
+                import rego.v1
+
+                # Default values
+                default validate := false
+                default msg := "Not evaluated"
+
+                # Check if the Pepr application deployments are healthy
+                validate if {
+                  controller_deployment_available.result
+                  controller_deployment_sufficient.result
+                  watcher_deployment_available.result
+                  watcher_deployment_sufficient.result
+                }
+
+                msg = concat(" ", [controller_deployment_available.msg, controller_deployment_sufficient.msg, watcher_deployment_available.msg, watcher_deployment_sufficient.msg])
+
+                # Check that both controller and watch deployments ready
+                pepr_controller := input.peprControllerDeployment
+                pepr_watcher := input.peprWatcherDeployment
+
+                controller_deployment_available := deployment_available(pepr_controller, "pepr-uds-core")
+                controller_deployment_sufficient := sufficient_replicas(pepr_controller, "pepr-uds-core")
+                watcher_deployment_available := deployment_available(pepr_watcher, "pepr-uds-core-watcher")
+                watcher_deployment_sufficient := sufficient_replicas(pepr_watcher, "pepr-uds-core-watcher")
+
+                # Check if the deployment is ready
+                deployment_available(deploy, name) = {"result": true, "msg": msg} if {
+                  deploy.kind == "Deployment"
+                  msg := sprintf("%s deployment is available.", [name])
+                } else = {"result": false, "msg": msg} if {
+                  msg := sprintf("%s deployment not available.", [name])
+                }
+
+                # Check if the deployment has sufficient replicas
+                sufficient_replicas(deploy, name) = {"result": true, "msg": msg} if {
+                  deploy.status.replicas > 0
+                  deploy.status.availableReplicas == deploy.status.replicas
+                  msg := sprintf("All replicas are available in %s.", [name])
+                } else = {"result": false, "msg": msg} if {
+                  msg := sprintf("Insufficient replicas are available in %s.", [name])
+                }
+            type: opa
+        title: pepr-health-check
+        uuid: 419274c0-cd55-46de-a7e4-e10d47be3f4a
+      - description: |
+          domain:
+            kubernetes-spec:
+              create-resources: null
+              resources:
+              - description: ""
+                name: webhooks
+                resource-rule:
+                  group: admissionregistration.k8s.io
+                  name: ""
+                  namespaces: []
+                  resource: mutatingwebhookconfigurations
+                  version: v1
+            type: kubernetes
+          lula-version: ""
+          metadata:
+            name: pepr-mutating-webhook-failure-policy
+            uuid: 82e9fb56-a290-4adf-9d2c-25b8ea45a726
+          provider:
+            opa-spec:
+              output:
+                observations:
+                - validate.msg
+                validation: validate.validate
+              rego: |
+                package validate
+                import rego.v1
+
+                # Default values
+                default validate := false
+                default msg := "Not evaluated"
+
+                validate if {
+                  failure_policy.result
+                }
+
+                msg = failure_policy.msg
+
+                # Check pepr mutating webhook failure policy
+                pepr_mutation_webhook := wh if {
+                  some i
+                  wh := input.webhooks[i]
+                  wh.metadata.name == "pepr-uds-core"
+                }
+
+                failure_policy = {"result": true, "msg": "Pepr mutating webhook failure policy is set to Fail"} if {
+                  every webhook in pepr_mutation_webhook.webhooks {
+                    webhook.failurePolicy == "Fail"
+                  }
+                } else = {"result": false, "msg": "Pepr mutating webhook failure policy is NOT set to Fail"}
+            type: opa
+        title: pepr-mutating-webhook-failure-policy
+        uuid: 82e9fb56-a290-4adf-9d2c-25b8ea45a726
+  components:
+    - control-implementations:
+        - description: Admission controller CR response
+          implemented-requirements:
+            - control-id: sc-7.21
+              description: Policies are enabled to the boundary needed for incoming (ingress) and outgoing (egress) traffic and configure a network policy and/or a constraint configuration.
+              links:
+                - href: '#419274c0-cd55-46de-a7e4-e10d47be3f4a'
+                  rel: lula
+                  text: Pepr Controller and Watcher Healthcheck
+                - href: '#42a3813b-026e-4be5-b888-87bfd6fe2790'
+                  rel: lula
+                  text: Check that new application has only the needed network policies
+              remarks: |
+                ASSESSMENT-OBJECTIVE:
+                boundary protection mechanisms are employed to isolate [Assignment: organization-defined system components] supporting [Assignment: organization-defined missions and/or business functions].
+              uuid: 3cefa46c-19e0-43f1-8d4f-96df8460af62
+          props:
+            - name: framework
+              ns: https://docs.lula.dev/oscal/ns
+              value: controller-check
+          source: source-controller-check
+          uuid: dd4d9f1c-1f23-577b-a783-800bfd156566
+        - description: Production Control Implementations - Read-only interrogation
+          implemented-requirements:
+            - control-id: cm-4
+              description: Pepr implements policies prevent unauthorized changes from occurring within the system.
+              links:
+                - href: '#419274c0-cd55-46de-a7e4-e10d47be3f4a'
+                  rel: lula
+                  text: Pepr Controller and Watcher Healthcheck
+                - href: '#82e9fb56-a290-4adf-9d2c-25b8ea45a726'
+                  rel: lula
+                  text: Pepr Mutating Webhook Failure Policy set to Fail -> System fails closed
+                - href: '#20e21219-ec6f-46ec-a9f0-d9262aa2835c'
+                  rel: lula
+                  text: Check all pods in the system drop all capabilities
+                - href: '#9fed0fd3-8d2a-4ce3-8b11-419e0f3463f4'
+                  rel: lula
+                  text: Check all pods in the system do not use root user
+              remarks: |
+                ASSESSMENT-OBJECTIVE:
+                CM-04[01] changes to the system are analyzed to determine potential security impacts prior to change implementation;
+                CM-04[02] changes to the system are analyzed to determine potential privacy impacts prior to change implementation.
+              uuid: 7ce1f9d9-6246-4067-a4a2-eb06502f27db
+          props:
+            - name: framework
+              ns: https://docs.lula.dev/oscal/ns
+              value: read
+          source: source-read
+          uuid: 72660e55-4a42-420a-8c12-0c9db3f5424d
+        - description: Staging Control Implementation - Writing to the system to test controller response
+          implemented-requirements:
+            - control-id: cm-4
+              description: Pepr implements policies prevent unauthorized changes from occurring within the system.
+              links:
+                - href: '#419274c0-cd55-46de-a7e4-e10d47be3f4a'
+                  rel: lula
+                  text: Pepr Controller and Watcher Healthcheck
+                - href: '#82e9fb56-a290-4adf-9d2c-25b8ea45a726'
+                  rel: lula
+                  text: Pepr Mutating Webhook Failure Policy set to Fail -> System fails closed
+                - href: '#912255cd-56da-4de2-983b-4b0c3e78ae17'
+                  rel: lula
+                  text: Test admission controller denies or mutates pods to drop all capabilities -> Pepr "DropAllCapabilities"
+                - href: '#20e21219-ec6f-46ec-a9f0-d9262aa2835c'
+                  rel: lula
+                  text: Check all pods in the system drop all capabilities
+                - href: '#5da9d58f-3a60-44a6-b88e-833c3db4ace3'
+                  rel: lula
+                  text: Test admission controller denies pods trying to run as root user -> Pepr "RequireNonRootUser"
+                - href: '#9fed0fd3-8d2a-4ce3-8b11-419e0f3463f4'
+                  rel: lula
+                  text: Check all pods in the system do not use root user
+              remarks: |
+                ASSESSMENT-OBJECTIVE:
+                CM-04[01] changes to the system are analyzed to determine potential security impacts prior to change implementation;
+                CM-04[02] changes to the system are analyzed to determine potential privacy impacts prior to change implementation.
+              uuid: 7ce1f9d9-6246-4067-a4a2-eb06502f27db
+          props:
+            - name: framework
+              ns: https://docs.lula.dev/oscal/ns
+              value: write
+          source: source-write
+          uuid: dd4d9f1c-1f23-577b-a783-800bfd156566
+      description: Component Description
+      title: UDS Operator
+      type: software
+      uuid: 9e050805-4dc0-4c9b-b877-660c466a9fb0
+  metadata:
+    last-modified: 2024-10-17T11:18:02.263412-04:00
+    oscal-version: 1.1.2
+    parties:
+      - links:
+          - href: https://defenseunicorns.com
+            rel: website
+        name: Defense Unicorns
+        type: organization
+        uuid: bf31d461-82af-529a-8bdf-09aa488e5b7e
+    published: 2024-09-06T02:23:11.557826692Z
+    remarks: Lula Generated Component Definition
+    title: UDS Operator
+    version: 0.0.1
+  uuid: e080849b-052f-4243-9e79-60b60a134387

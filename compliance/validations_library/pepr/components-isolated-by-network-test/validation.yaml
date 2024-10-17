@@ -14,7 +14,7 @@ domain:
             name: package-test
             namespace: validation-test
           spec:
-            network:   
+            network:
               # Allow rules generate NetworkPolicies
               allow:
                 - direction: Ingress
@@ -38,6 +38,7 @@ provider:
   opa-spec:
     rego: |
       package validate
+      import rego.v1
 
       default validate := false
       default msg := "Not evaluated"
@@ -53,13 +54,14 @@ provider:
       num_netpols_expected := 5
       netpols := {sprintf("%s/%s", [netpol.metadata.namespace, netpol.metadata.name]) | netpol := input.netpols[_]; netpol.kind == "NetworkPolicy"}
 
-      check_all_network_policies := {"result": true, "msg": msg} if {
+      check_all_network_policies_created := {"result": true, "msg": msg} if {
         count(netpols) == num_netpols_expected
         msg := sprintf("All %d network policies were created.", [num_netpols_expected])
       } else = {"result": false, "msg": msg} if {
         msg := sprintf("Expected %d network policies, but only %d were created.", [num_netpols_expected, count(netpols)])
       }
-    outputs:
+    output:
+      validation: validate.validate
       observations:
         - validate.msg
         - validate.msg_netpols_created
